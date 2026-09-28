@@ -4,28 +4,23 @@
 
   Mathlib-free. Zero sorry.
   Observables and certificates use Nat.
-  These facts license governor behaviour. They do not publish wall-clock.
 -/
 
 import AGDGovernor.Core
 
 namespace AGDGovernor
 
-/-! ## THM_000101-103  jitter closeness -/
-
 def jitter {alpha} (J : alpha -> Nat) (a b : alpha) : Nat := dist (J a) (J b)
 
 def jitterClose {alpha} (J : alpha -> Nat) (eps : Nat) (a b : alpha) : Prop :=
   jitter J a b <= eps
 
-/-- THM_000101 jitter_close_reflexive -/
 theorem jitter_close_reflexive {alpha} (J : alpha -> Nat) (eps : Nat) (A : alpha) :
     jitterClose J eps A A := by
   unfold jitterClose jitter
   rw [dist_self]
   exact Nat.zero_le eps
 
-/-- THM_000102 jitter_close_symmetric -/
 theorem jitter_close_symmetric {alpha} (J : alpha -> Nat) (eps : Nat) (A B : alpha) :
     jitterClose J eps A B -> jitterClose J eps B A := by
   intro h
@@ -33,15 +28,12 @@ theorem jitter_close_symmetric {alpha} (J : alpha -> Nat) (eps : Nat) (A B : alp
   rw [dist_comm]
   exact h
 
-/-- THM_000103 jitter_close_triangle -/
 theorem jitter_close_triangle {alpha} (J : alpha -> Nat) (eps : Nat) (A B C : alpha)
     (hAB : jitterClose J eps A B) (hBC : jitterClose J eps B C) :
     jitter J A C <= eps + eps := by
   unfold jitterClose jitter at *
   have h := dist_triangle (J A) (J B) (J C)
   omega
-
-/-! ## THM_000104  operator preserves equivalence -/
 
 def equivalent {alpha} (J : alpha -> Nat) (eps : Nat) (A B : alpha) : Prop :=
   jitterClose J eps A B
@@ -55,8 +47,6 @@ theorem operator_preserves_equivalence {alpha}
   rw [h_const, h_const]
   exact h
 
-/-! ## THM_000105-106  certificate positivity / validity -/
-
 structure BenchCert where
   baseline  : Nat
   candidate : Nat
@@ -68,7 +58,6 @@ def measuredSpeedup (c : BenchCert) : Nat :=
 def validCert (c : BenchCert) : Prop :=
   0 < c.baseline /\ 0 < c.candidate /\ c.candidate <= c.baseline
 
-/-- THM_000105 speedup_positive -/
 theorem speedup_positive (c : BenchCert) (h : validCert c) :
     0 < measuredSpeedup c := by
   unfold validCert measuredSpeedup at *
@@ -78,7 +67,6 @@ theorem speedup_positive (c : BenchCert) (h : validCert c) :
   rw [hden]
   exact Nat.div_pos hle hpos
 
-/-- THM_000106 benchmark_claim_valid -/
 theorem benchmark_claim_valid (c : BenchCert) (h : validCert c) :
     measuredSpeedup c = c.baseline / c.candidate := by
   unfold validCert measuredSpeedup at *
@@ -86,14 +74,10 @@ theorem benchmark_claim_valid (c : BenchCert) (h : validCert c) :
   have hden : max c.candidate 1 = c.candidate := Nat.max_eq_left (Nat.succ_le_of_lt hpos)
   rw [hden]
 
-/-! ## THM_000107  transport closure -/
-
 def Omega (s : State) : Nat := s.obs
 
 theorem agd_transport_closure (T : State -> State) (h : Admissible T) (s : State) :
     Omega (T s) = Omega s := h s
-
-/-! ## THM_000108  iterate still preserves Omega -/
 
 theorem curvature_convergence (T : State -> State) (h : Admissible T) :
     forall n s, Omega (iter T n s) = Omega s := by
@@ -104,8 +88,6 @@ theorem curvature_convergence (T : State -> State) (h : Admissible T) :
     simp [iter, Omega, Admissible] at *
     rw [h, ih]
 
-/-! ## THM_000109  bisimulation on the observable -/
-
 def bisim (T U : State -> State) : Prop :=
   forall s, Omega (T s) = Omega (U s)
 
@@ -114,16 +96,12 @@ theorem agd_bisimulation (T U : State -> State)
   intro s
   rw [hT s, hU s]
 
-/-! ## THM_000110  flow semigroup on Nat time -/
-
 theorem agd_flow_semigroup {alpha}
     (T : Nat -> alpha -> alpha)
     (h : forall t s q, T (t + s) q = T t (T s q)) :
-    forall t s q, T (t + s) q = (T t compose T s) q := by
+    forall t s q, T (t + s) q = T t (T s q) := by
   intro t s q
   exact h t s q
-
-/-! ## THM_000111  master dynamic closure -/
 
 theorem agd_master_dynamic_closure
     (T : Nat -> State -> State) (J : Nat -> Nat)
@@ -132,33 +110,26 @@ theorem agd_master_dynamic_closure
     (forall t, Omega (T t q) = Omega q) /\ (forall t, t > 0 -> J t < J 0) :=
   And.intro (fun t => h_transport t q) h_descent
 
-/-! ## THM_000112  iterate of an admissible map stays admissible -/
-
 theorem agd_spectral_convergence (T : State -> State) (h : Admissible T) :
     forall n, Admissible (iter T n) := by
   intro n s
   exact curvature_convergence T h n s
-
-/-! ## THM_000201  adaptive operator -/
 
 structure Operator where
   op         : State -> State
   admissible : Admissible op
 
 def IsAdaptive (loss : State -> Nat) (psi : State) (choices : List Operator) (sel : Operator) : Prop :=
-  sel.admissible psi /\
-    forall o, o ∈ choices -> loss (sel.op psi) <= loss (o.op psi)
+  sel.admissible psi /\ forall o : Operator, List.Mem o choices -> loss (sel.op psi) <= loss (o.op psi)
 
 theorem adaptive_operator_preservation
     (loss : State -> Nat) (psi : State) (choices : List Operator) (sel : Operator)
     (h : IsAdaptive loss psi choices sel) :
     Omega (sel.op psi) = Omega psi /\
-      forall o, o ∈ choices -> loss (sel.op psi) <= loss (o.op psi) := by
+      forall o : Operator, List.Mem o choices -> loss (sel.op psi) <= loss (o.op psi) := by
   constructor
   · exact sel.admissible psi
   · exact h.2
-
-/-! ## THM_000202  failure recovery rollback -/
 
 structure Transition where
   before : State
@@ -179,8 +150,6 @@ theorem agd_failure_recovery (expected : Nat) (t : Transition)
     rw [heq] at h_before
     exact h_after h_before
 
-/-! ## THM_000203  learning manifold stability -/
-
 def InvariantStableRegion (target : Nat) (s : State) : Prop := Omega s = target
 
 def ManifoldAdmissible (T : State -> State) : Prop := Admissible T
@@ -200,8 +169,6 @@ theorem learning_manifold_stability
     rw [hT]
     exact ih
 
-/-! ## THM_000204  memory lineage reconstruction -/
-
 inductive Lineage : Type
   | nil
   | cons (op : State -> State) (rest : Lineage)
@@ -215,8 +182,6 @@ theorem memory_lineage_reconstruction
     (h : current = reconstruct start l) :
     Exists start0, Exists l0, current = reconstruct start0 l0 :=
   Exists.intro start (Exists.intro l h)
-
-/-! ## THM_000205  autonomous cycle preserves Omega -/
 
 structure Cycle where
   init : State
