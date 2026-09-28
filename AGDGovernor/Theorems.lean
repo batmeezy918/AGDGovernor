@@ -87,7 +87,7 @@ def bisim (T U : State -> State) : Prop :=
 theorem agd_bisimulation (T U : State -> State)
     (hT : Admissible T) (hU : Admissible U) : bisim T U := by
   intro s
-  unfold bisim Omega
+  unfold Omega
   rw [hT, hU]
 
 theorem agd_flow_semigroup {alpha}
@@ -135,8 +135,14 @@ def IsStable (expected : Nat) (s : State) : Prop := Omega s = expected
 theorem agd_failure_recovery (expected : Nat) (t : Transition)
     (h_before : IsStable expected t.before)
     (h_after  : Not (IsStable expected t.after)) :
-    IsStable expected (rollback t) /\ Not (rollback t = t.after) :=
-  And.intro h_before (fun heq => h_after (heq ▸ h_before))
+    IsStable expected (rollback t) /\ Not (rollback t = t.after) := by
+  constructor
+  · exact h_before
+  · intro heq
+    apply h_after
+    unfold rollback at heq
+    rw [<- heq]
+    exact h_before
 
 def InvariantStableRegion (target : Nat) (s : State) : Prop := Omega s = target
 
