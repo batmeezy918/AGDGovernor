@@ -1,0 +1,53 @@
+name: Lean4 Verification
+
+on:
+  push:
+    paths:
+      - "AGDGovernor/**"
+      - "*.lean"
+      - "lakefile.toml"
+      - "lean-toolchain"
+      - ".github/workflows/lean_verify.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lean 4
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.29.0
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          source $HOME/.elan/env
+          lean --version
+
+      - name: Reject sorry
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          pat = re.compile(r'(?<![A-Za-z_/])sorry(?![A-Za-z_])')
+          allow = ('no `sorry`', 'zero sorry', 'no sorry')
+          bad = []
+          for p in pathlib.Path('.').rglob('*.lean'):
+              if '.lake' in p.parts:
+                  continue
+              for i, line in enumerate(p.read_text(encoding='utf-8').splitlines(), 1):
+                  s = line.strip().lower()
+                  if s.startswith('--') or any(a in s for a in allow):
+                      continue
+                  if pat.search(line):
+                      bad.append(f'{p}:{i}:{line}')
+          if bad:
+              print('\n'.join(bad))
+              sys.exit(1)
+          print('sorry-scan clean')
+          PY
+
+      - name: Build AGDGovernor (zero sorry, Lean 4.29 kernel)
+        run: |
+          lake build
+          echo "Build completed successfully — zero sorry, Lean 4.29.0 kernel pass"

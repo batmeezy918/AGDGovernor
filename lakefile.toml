@@ -1,0 +1,10 @@
+name = "AGDGovernor"
+version = "0.1.0"
+defaultTargets = ["agdgovernor"]
+
+[[lean_lib]]
+name = "AGDGovernor"
+
+[[lean_exe]]
+name = "agdgovernor"
+root = "Main"
