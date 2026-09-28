@@ -1,11 +1,3 @@
-/-
-  Port of Proven Agd Theorums THM_000101 through THM_000205
-  from the 2026-07-10 status zip.
-
-  Mathlib-free. Zero sorry.
-  Observables and certificates use Nat.
--/
-
 import AGDGovernor.Core
 
 namespace AGDGovernor
@@ -60,18 +52,18 @@ def validCert (c : BenchCert) : Prop :=
 
 theorem speedup_positive (c : BenchCert) (h : validCert c) :
     0 < measuredSpeedup c := by
-  unfold validCert measuredSpeedup at *
   have hpos : 0 < c.candidate := h.2.1
   have hle  : c.candidate <= c.baseline := h.2.2
   have hden : max c.candidate 1 = c.candidate := Nat.max_eq_left (Nat.succ_le_of_lt hpos)
+  unfold measuredSpeedup
   rw [hden]
   exact Nat.div_pos hle hpos
 
 theorem benchmark_claim_valid (c : BenchCert) (h : validCert c) :
     measuredSpeedup c = c.baseline / c.candidate := by
-  unfold validCert measuredSpeedup at *
   have hpos : 0 < c.candidate := h.2.1
   have hden : max c.candidate 1 = c.candidate := Nat.max_eq_left (Nat.succ_le_of_lt hpos)
+  unfold measuredSpeedup
   rw [hden]
 
 def Omega (s : State) : Nat := s.obs
@@ -83,9 +75,10 @@ theorem curvature_convergence (T : State -> State) (h : Admissible T) :
     forall n s, Omega (iter T n s) = Omega s := by
   intro n s
   induction n with
-  | zero => simp [iter, Omega]
+  | zero => rfl
   | succ n ih =>
-    simp [iter, Omega, Admissible] at *
+    change Omega (T (iter T n s)) = Omega s
+    unfold Omega at *
     rw [h, ih]
 
 def bisim (T U : State -> State) : Prop :=
@@ -94,14 +87,13 @@ def bisim (T U : State -> State) : Prop :=
 theorem agd_bisimulation (T U : State -> State)
     (hT : Admissible T) (hU : Admissible U) : bisim T U := by
   intro s
-  rw [hT s, hU s]
+  unfold bisim Omega
+  rw [hT, hU]
 
 theorem agd_flow_semigroup {alpha}
     (T : Nat -> alpha -> alpha)
     (h : forall t s q, T (t + s) q = T t (T s q)) :
-    forall t s q, T (t + s) q = T t (T s q) := by
-  intro t s q
-  exact h t s q
+    forall t s q, T (t + s) q = T t (T s q) := h
 
 theorem agd_master_dynamic_closure
     (T : Nat -> State -> State) (J : Nat -> Nat)
@@ -119,17 +111,18 @@ structure Operator where
   op         : State -> State
   admissible : Admissible op
 
+def allLe (loss : State -> Nat) (psi : State) (sel : Operator) : List Operator -> Prop
+  | [] => True
+  | o :: rest => loss (sel.op psi) <= loss (o.op psi) /\ allLe loss psi sel rest
+
 def IsAdaptive (loss : State -> Nat) (psi : State) (choices : List Operator) (sel : Operator) : Prop :=
-  sel.admissible psi /\ forall o : Operator, List.Mem o choices -> loss (sel.op psi) <= loss (o.op psi)
+  Admissible sel.op /\ allLe loss psi sel choices
 
 theorem adaptive_operator_preservation
     (loss : State -> Nat) (psi : State) (choices : List Operator) (sel : Operator)
     (h : IsAdaptive loss psi choices sel) :
-    Omega (sel.op psi) = Omega psi /\
-      forall o : Operator, List.Mem o choices -> loss (sel.op psi) <= loss (o.op psi) := by
-  constructor
-  · exact sel.admissible psi
-  · exact h.2
+    Omega (sel.op psi) = Omega psi /\ allLe loss psi sel choices :=
+  And.intro (sel.admissible psi) h.2
 
 structure Transition where
   before : State
@@ -142,13 +135,8 @@ def IsStable (expected : Nat) (s : State) : Prop := Omega s = expected
 theorem agd_failure_recovery (expected : Nat) (t : Transition)
     (h_before : IsStable expected t.before)
     (h_after  : Not (IsStable expected t.after)) :
-    IsStable expected (rollback t) /\ Not (rollback t = t.after) := by
-  constructor
-  · exact h_before
-  · intro heq
-    unfold rollback at heq
-    rw [heq] at h_before
-    exact h_after h_before
+    IsStable expected (rollback t) /\ Not (rollback t = t.after) :=
+  And.intro h_before (fun heq => h_after (heq ▸ h_before))
 
 def InvariantStableRegion (target : Nat) (s : State) : Prop := Omega s = target
 
@@ -161,11 +149,10 @@ theorem learning_manifold_stability
     forall n, InvariantStableRegion target (iter T n M0) := by
   intro n
   induction n with
-  | zero =>
-    simpa [iter] using h0
+  | zero => exact h0
   | succ n ih =>
-    unfold InvariantStableRegion ManifoldAdmissible Admissible Omega at *
-    simp [iter]
+    unfold InvariantStableRegion Omega ManifoldAdmissible Admissible at *
+    change (T (iter T n M0)).obs = target
     rw [hT]
     exact ih
 
@@ -180,8 +167,7 @@ def reconstruct (start : State) : Lineage -> State
 theorem memory_lineage_reconstruction
     (start : State) (l : Lineage) (current : State)
     (h : current = reconstruct start l) :
-    Exists start0, Exists l0, current = reconstruct start0 l0 :=
-  Exists.intro start (Exists.intro l h)
+    current = reconstruct start l := h
 
 structure Cycle where
   init : State
