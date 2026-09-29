@@ -159,7 +159,6 @@ def S (g : SpecGen) : SpecGen :=
 
 theorem S_involutive (g : SpecGen) : S (S g) = g := rfl
 theorem S_squared_eq_id (g : SpecGen) : S (S g) = g := S_involutive g
-
 theorem S_h (g : SpecGen) : (S g).h = g.hInv := rfl
 theorem S_hInv (g : SpecGen) : (S g).hInv = g.h := rfl
 
@@ -169,8 +168,7 @@ def Ft (rho : Int) (g : SpecGen) : Int :=
 theorem Ft_odd (rho : Int) (g : SpecGen) :
     Ft rho (S g) = - Ft rho g := by
   unfold Ft
-  rw [S_h, S_hInv]
-  omega
+  rw [S_h, S_hInv, Int.mul_sub, Int.mul_sub, Int.neg_sub]
 
 def Dt (rho : Int) (g : SpecGen) : Int :=
   rho * (g.h + g.hInv)
@@ -178,8 +176,7 @@ def Dt (rho : Int) (g : SpecGen) : Int :=
 theorem Dt_even (rho : Int) (g : SpecGen) :
     Dt rho (S g) = Dt rho g := by
   unfold Dt
-  rw [S_h, S_hInv]
-  omega
+  rw [S_h, S_hInv, Int.add_comm]
 
 structure ThreeWay where
   gen  : SpecGen
