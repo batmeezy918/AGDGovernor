@@ -1,13 +1,7 @@
 /-
   AGDGovernor.QXCMI
-
   QX-TLX-CMI/BKM Three-Way Bridge -- algebraic operator calculus.
-
-  Principal formal target (zero residual):
-
-      I''(0) + Gamma_BKM(sigma; X) + Tr[Y log sigma] = 0
-
-  Author: James Michael Darnell (JMKK)
+  Principal target: I''(0) + Gamma + Tr[Y logS] = 0
   Lean: 4.29.0    Mathlib: none    zero sorry
 -/
 
@@ -55,9 +49,7 @@ def OA (r : Response) : Int := accel r
 def OCMI (r : Response) : Int := OA r - (OXi r : Int)
 
 theorem OCMI_eq_Ipp (r : Response) : OCMI r = Ipp r := rfl
-
 theorem QX_CMI_001 (o : Orbit) : OX o = o.resp.X := rfl
-
 theorem QX_CMI_002 (o : Orbit) : OY o = o.resp.Y := rfl
 
 theorem QX_CMI_003_entropy_hessian (r : Response) :
@@ -78,8 +70,7 @@ theorem QX_CMI_004_discharge (r : Response)
 theorem QX_CMI_004_holds_on_this_algebra (r : Response) :
     LocalUnitaryCMIReduction (Ipp r) (Spp r) := rfl
 
-theorem QX_CMI_005_ident (r : Response) :
-    OXi r = gammaBKM r := rfl
+theorem QX_CMI_005_ident (r : Response) : OXi r = gammaBKM r := rfl
 
 theorem QX_CMI_005_nonneg (r : Response) :
     0 <= (gammaBKM r : Int) :=
@@ -167,16 +158,18 @@ def S (g : SpecGen) : SpecGen :=
   { h := g.hInv, hInv := g.h }
 
 theorem S_involutive (g : SpecGen) : S (S g) = g := rfl
+theorem S_squared_eq_id (g : SpecGen) : S (S g) = g := S_involutive g
 
-theorem S_squared_eq_id (g : SpecGen) : S (S g) = g :=
-  S_involutive g
+theorem S_h (g : SpecGen) : (S g).h = g.hInv := rfl
+theorem S_hInv (g : SpecGen) : (S g).hInv = g.h := rfl
 
 def Ft (rho : Int) (g : SpecGen) : Int :=
   rho * (g.h - g.hInv)
 
 theorem Ft_odd (rho : Int) (g : SpecGen) :
     Ft rho (S g) = - Ft rho g := by
-  unfold Ft S
+  unfold Ft
+  rw [S_h, S_hInv]
   omega
 
 def Dt (rho : Int) (g : SpecGen) : Int :=
@@ -184,7 +177,8 @@ def Dt (rho : Int) (g : SpecGen) : Int :=
 
 theorem Dt_even (rho : Int) (g : SpecGen) :
     Dt rho (S g) = Dt rho g := by
-  unfold Dt S
+  unfold Dt
+  rw [S_h, S_hInv]
   omega
 
 structure ThreeWay where
@@ -192,8 +186,7 @@ structure ThreeWay where
   resp : Response
   deriving Repr
 
-def packet (w : ThreeWay) : SpecGen × Int × Int × Nat × Int × Int :=
-  (S w.gen, w.resp.X, w.resp.Y, gammaBKM w.resp, accel w.resp, Ipp w.resp)
+def packet (w : ThreeWay) : SpecGen := S w.gen
 
 theorem threeway_invariant (w : ThreeWay) :
     Ipp w.resp + (gammaBKM w.resp : Int) + trYlog w.resp = 0 :=
