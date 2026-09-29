@@ -19,3 +19,16 @@
 | 203 | `learning_manifold_stability` | iterate inside an Omega region | claim learning happened |
 | 204 | `memory_lineage_reconstruction` | unpack a lineage witness | reconstruct without the witness |
 | 205 | `agd_autonomous_closure` | run one adaptive cycle and keep Omega | call the cycle a verified optimizer |
+| CMI-001 | `QX_CMI_001` | read X as the first reduced-response operator output | treat X as a partial trace on B(H) |
+| CMI-002 | `QX_CMI_002` | read Y as the second reduced-response operator output | treat Y as ad_H^2 on a density operator |
+| CMI-003 | `QX_CMI_003_*` | use S'' = A - Gamma on Int observables | quote a von Neumann Hessian |
+| CMI-004 | `LocalUnitaryCMIReduction` | discharge I'' = S'' on this algebra | claim the Hilbert-space CMI reduction |
+| CMI-005 | `QX_CMI_005_nonneg` | treat discrete Gamma = |X|^2 as nonnegative | claim BKM positivity of Dlog |
+| CMI-006 | `QX_CMI_006_master_bridge` | decompose I'' as A - Gamma | revive I'' = Gamma_ABC - Gamma_AB |
+| CMI-007 | `QX_CMI_007_zero_residual` | treat residual Omega as identically 0 | skip the definition of I'' |
+| CMI-008 | `QX_CMI_008_sign` | when Y = 0, conclude I'' = -Gamma <= 0 | claim I'' is always nonpositive |
+| CMI-009 | `QX_CMI_009_zero_tangent` | when X = 0, conclude I'' = A | claim X = 0 implies Y = 0 |
+| CMI-010 | `QX_CMI_010_flat` | when X = Y = 0, conclude I'' = 0 | call a flat orbit a verified optimizer |
+| SPEC-S | `S_involutive` | invert a tagged generator twice and recover it | insert S into the CMI derivation |
+| SPEC-F | `Ft_odd` | treat F as odd under S | treat numerical oddness as a CMI proof |
+| SPEC-D | `Dt_even` | treat D as even under S | treat numerical evenness as a CMI proof |
