@@ -1,0 +1,19 @@
+name: MUNI
+on:
+  push:
+    paths:
+      - 'muni/**'
+  pull_request:
+    paths:
+      - 'muni/**'
+jobs:
+  source-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifest
+        run: python3 -m json.tool muni/MANIFEST.json >/dev/null
+      - name: Compile native runtime
+        run: gcc -O2 -fsyntax-only muni/native/agd_runtime.c
+      - name: Validate CLI syntax
+        run: python3 -m py_compile muni/muni.py
