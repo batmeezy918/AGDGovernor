@@ -1,0 +1,1 @@
+The benchmark matrix compares an optimized full-state baseline against the quotient path with setup and final reconstruction included. Correctness gates are independent of timing. Do not interpret the multiplier as a universal theorem.
