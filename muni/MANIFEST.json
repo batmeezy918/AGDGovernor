@@ -1,0 +1,8 @@
+{
+  "name":"agd-muni",
+  "version":"0.2.0",
+  "product":"proof-carrying-optimization",
+  "architecture":"aarch64",
+  "native_witness":"persistent-invariant-sector-quotient",
+  "universal_speedup_claim":false
+}
