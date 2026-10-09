@@ -1,0 +1,14 @@
+{
+  "title": "AGD MUNI — Edge Silicon Governor",
+  "description": "Proposed only. Initially inspected metrics had no current samples in the latest six-hour window. Scope with device_id after approved telemetry emission; absent telemetry is not zero.",
+  "tags": ["team:agd"],
+  "widgets": [
+    {"definition":{"type":"timeseries","title":"Thermal maximum (°C)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"thermal","query":"max:agd.muni.thermal.cpu_soc_max_c{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"timeseries","title":"CPU frequency (MHz)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"frequency","query":"avg:agd.muni.cpu.frequency_mhz{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"timeseries","title":"CPU utilization (%)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"utilization","query":"avg:agd.muni.cpu.utilization_pct{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"timeseries","title":"MUNI speedup (x)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"speedup","query":"avg:agd.muni.benchmark.speedup{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"timeseries","title":"Optimized latency (ms)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"latency","query":"avg:agd.muni.benchmark.optimized_ms{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"timeseries","title":"Correctness error (must remain 0)","requests":[{"response_format":"timeseries","queries":[{"data_source":"metrics","name":"max_error","query":"max:agd.muni.benchmark.max_abs_error{*} by {device_id}"}]}]},"layout":{"width":6,"height":3}},
+    {"definition":{"type":"note","content":"Safety: missing/stale telemetry => OBSERVE_ONLY. Evidence/correctness failure => QUARANTINE. Non-admissible input => original full-state fallback and no speedup claim. This dashboard observes; it does not modify hardware policy.","background_color":"yellow","font_size":"14","text_align":"left"},"layout":{"width":12,"height":2}}
+  ]
+}
