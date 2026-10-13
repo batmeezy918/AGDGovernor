@@ -83,6 +83,14 @@ jobs:
             echo 'COMPARATOR_AVAILABLE=false' > artifacts/pcss/comparator_status.txt
             echo 'External comparator is not yet configured; independent-check gate remains pending.' >> artifacts/pcss/comparator_status.txt
           fi
+      - name: Enforce independent checker gate
+        if: always()
+        run: |
+          if [ "${{ steps.comparator.outcome }}" != "success" ]; then
+            echo 'INDEPENDENT_CHECKER=BLOCKED'
+            exit 1
+          fi
+          echo 'INDEPENDENT_CHECKER=CAPABILITY_PRESENT'
       - name: Upload formal receipts
         if: always()
         uses: actions/upload-artifact@v4
