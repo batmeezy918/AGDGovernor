@@ -1,0 +1,123 @@
+name: PCSS Proof-Carrying Speedup Chain
+
+on:
+  push:
+    paths:
+      - 'AGDGovernor/**'
+      - 'muni/**'
+      - 'pcss/**'
+      - 'scripts/pcss/**'
+      - '*.lean'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/pcss-proof-carrying.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pcss-proof-carrying-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  formal-build:
+    name: Formal build and kernel replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Lean toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          source "$HOME/.elan/env"
+          lean --version
+          lake --version
+      - name: Record source and toolchain identity
+        run: |
+          mkdir -p artifacts/pcss
+          git rev-parse HEAD > artifacts/pcss/source_revision.txt
+          sha256sum lean-toolchain lakefile.toml lake-manifest.json > artifacts/pcss/toolchain_inputs.sha256
+          lean --version > artifacts/pcss/lean_version.txt
+          lake --version > artifacts/pcss/lake_version.txt
+      - name: Build all declared Lean targets
+        run: lake build
+      - name: Scan project proofs for sorry
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          bad=[]
+          pat=re.compile(r'(?<![A-Za-z_/])sorry(?![A-Za-z_])')
+          for p in pathlib.Path('.').rglob('*.lean'):
+              if any(x in p.parts for x in ('.lake','.git')): continue
+              for i,line in enumerate(p.read_text(encoding='utf-8').splitlines(),1):
+                  s=line.strip().lower()
+                  if s.startswith('--') or s.startswith('/-') or 'no sorry' in s or 'zero sorry' in s: continue
+                  if pat.search(line): bad.append(f'{p}:{i}:{line}')
+          if bad:
+              print('\n'.join(bad)); sys.exit(1)
+          print('SORRY_SCAN=PASS')
+          PY
+      - name: Recheck built declarations with Lean checker
+        run: |
+          set -eu
+          lake env leanchecker --version
+          lake env leanchecker --fresh AGDGovernor.Core
+          lake env leanchecker --fresh AGDGovernor.QXCMI
+          lake env leanchecker --fresh AGDGovernor.Theorems
+          echo 'LEAN_CHECKER_REPLAY=PASS' | tee artifacts/pcss/leanchecker_status.txt
+      - name: Comparator capability probe (not silently downgraded)
+        id: comparator
+        continue-on-error: true
+        run: |
+          lake comparator --help
+      - name: Record comparator status
+        if: always()
+        run: |
+          if [ "${{ steps.comparator.outcome }}" = "success" ]; then
+            echo 'COMPARATOR_AVAILABLE=true' > artifacts/pcss/comparator_status.txt
+          else
+            echo 'COMPARATOR_AVAILABLE=false' > artifacts/pcss/comparator_status.txt
+            echo 'External comparator is not yet configured; independent-check gate remains pending.' >> artifacts/pcss/comparator_status.txt
+          fi
+      - name: Upload formal receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcss-formal-receipts
+          path: artifacts/pcss/
+          if-no-files-found: error
+
+  evidence-contract:
+    name: Evidence schema and fail-closed admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate evidence contract
+        run: |
+          python3 -m json.tool pcss/schemas/speedup-evidence.schema.json >/dev/null
+          python3 scripts/pcss/validate_evidence.py --schema pcss/schemas/speedup-evidence.schema.json --self-test
+      - name: Upload schema validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcss-evidence-contract
+          path: artifacts/pcss-schema/
+          if-no-files-found: error
+
+  promotion:
+    name: PCSS promotion decision
+    runs-on: ubuntu-latest
+    needs: [formal-build, evidence-contract]
+    if: always()
+    steps:
+      - name: Enforce fail-closed promotion
+        run: |
+          if [ "${{ needs.formal-build.result }}" != "success" ] || [ "${{ needs.evidence-contract.result }}" != "success" ]; then
+            echo 'PCSS_PROMOTION=BLOCKED'
+            exit 1
+          fi
+          echo 'PCSS_PROMOTION=FORMAL_AND_SCHEMA_GATES_PASS; TELEMETRY_AND_BENCHMARK_EVIDENCE_REQUIRED_PER_CLAIM'
