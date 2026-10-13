@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://batmeezy918.github.io/AGDGovernor/pcss/schemas/speedup-evidence.schema.json",
+  "title": "PCSS Proof-Carrying Speedup Evidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "claim_id",
+    "source",
+    "formal",
+    "implementation",
+    "execution",
+    "benchmark",
+    "promotion"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pcss-speedup-evidence-v1"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "repository",
+        "revision",
+        "source_manifest_sha256",
+        "dirty_tree"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "source_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dirty_tree": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "formal": {
+      "type": "object",
+      "required": [
+        "toolchain",
+        "build_status",
+        "sorry_scan",
+        "theorem_manifest_sha256",
+        "kernel_replay_status",
+        "independent_checker_status",
+        "permitted_axioms"
+      ],
+      "properties": {
+        "toolchain": {
+          "type": "string"
+        },
+        "build_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING"
+          ]
+        },
+        "sorry_scan": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING"
+          ]
+        },
+        "theorem_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "kernel_replay_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING"
+          ]
+        },
+        "independent_checker_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING",
+            "NOT_CONFIGURED"
+          ]
+        },
+        "permitted_axioms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "theorem_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "implementation": {
+      "type": "object",
+      "required": [
+        "build_sha256",
+        "equivalence_status",
+        "mapping_manifest_sha256"
+      ],
+      "properties": {
+        "build_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "equivalence_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING"
+          ]
+        },
+        "mapping_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "device_class",
+        "runtime_status",
+        "telemetry_sha256",
+        "environment_manifest_sha256"
+      ],
+      "properties": {
+        "device_class": {
+          "type": "string"
+        },
+        "runtime_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "PENDING"
+          ]
+        },
+        "telemetry_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "environment_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "benchmark": {
+      "type": "object",
+      "required": [
+        "baseline_e2e_ns",
+        "optimized_e2e_ns",
+        "speedup_measured",
+        "accounting_complete",
+        "workload_id",
+        "raw_results_sha256"
+      ],
+      "properties": {
+        "baseline_e2e_ns": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "optimized_e2e_ns": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speedup_measured": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speedup_ideal": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "speedup_composed": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "speedup_cumulative": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "accounting_complete": {
+          "type": "boolean"
+        },
+        "workload_id": {
+          "type": "string"
+        },
+        "raw_results_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "promotion": {
+      "type": "object",
+      "required": [
+        "claim_strength",
+        "evidence_strength",
+        "status",
+        "block_reasons"
+      ],
+      "properties": {
+        "claim_strength": {
+          "enum": [
+            "HYPOTHESIS",
+            "STRUCTURAL",
+            "MEASURED",
+            "VERIFIED",
+            "CUMULATIVE_VERIFIED"
+          ]
+        },
+        "evidence_strength": {
+          "enum": [
+            "NONE",
+            "STRUCTURAL",
+            "MEASURED",
+            "FORMAL",
+            "INDEPENDENTLY_CHECKED",
+            "END_TO_END_VERIFIED"
+          ]
+        },
+        "status": {
+          "enum": [
+            "BLOCKED",
+            "CANDIDATE",
+            "PROMOTED"
+          ]
+        },
+        "block_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

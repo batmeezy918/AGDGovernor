@@ -3,9 +3,11 @@ on:
   push:
     paths:
       - 'muni/**'
+      - '.github/workflows/muni.yml'
   pull_request:
     paths:
       - 'muni/**'
+      - '.github/workflows/muni.yml'
 jobs:
   source-integrity:
     runs-on: ubuntu-latest
@@ -13,7 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate manifest
         run: python3 -m json.tool muni/MANIFEST.json >/dev/null
-      - name: Compile native runtime
-        run: gcc -O2 -fsyntax-only muni/native/agd_runtime.c
+      - name: Validate native runtime interface header
+        run: |
+          printf '#include "muni/native/agd_runtime.h"\nint main(void) { return 0; }\n' |
+            gcc -O2 -Wall -Wextra -Werror -x c -fsyntax-only -
       - name: Validate CLI syntax
         run: python3 -m py_compile muni/muni.py

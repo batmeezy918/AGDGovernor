@@ -1,0 +1,146 @@
+name: PCSS Proof-Carrying Speedup Chain
+
+on:
+  push:
+    paths:
+      - 'AGDGovernor/**'
+      - 'muni/**'
+      - 'pcss/**'
+      - 'scripts/pcss/**'
+      - '*.lean'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/pcss-proof-carrying.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pcss-proof-carrying-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  formal-build:
+    name: Formal build and kernel replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Lean toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          source "$HOME/.elan/env"
+          lean --version
+          lake --version
+      - name: Record source and toolchain identity
+        run: |
+          mkdir -p artifacts/pcss
+          git rev-parse HEAD > artifacts/pcss/source_revision.txt
+          sha256sum lean-toolchain lakefile.toml lake-manifest.json > artifacts/pcss/toolchain_inputs.sha256
+          lean --version > artifacts/pcss/lean_version.txt
+          lake --version > artifacts/pcss/lake_version.txt
+      - name: Build all declared Lean targets
+        run: lake build
+      - name: Fresh kernel replay
+        run: |
+          set -eu
+          lake env leanchecker --fresh AGDGovernor.Core
+          lake env leanchecker --fresh AGDGovernor.QXCMI
+          lake env leanchecker --fresh AGDGovernor.Theorems
+          echo 'LEAN_CHECKER_REPLAY=PASS' | tee artifacts/pcss/leanchecker_status.txt
+      - name: Project proof placeholder scan
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          bad=[]
+          pat=re.compile(r'(?<![A-Za-z_/])sorry(?![A-Za-z_])')
+          for p in pathlib.Path('.').rglob('*.lean'):
+              if any(x in p.parts for x in ('.lake','.git')): continue
+              text=p.read_text(encoding='utf-8')
+              out=[]; i=0; depth=0; line_comment=False
+              while i < len(text):
+                  if line_comment:
+                      if text[i]=='\\n': line_comment=False; out.append('\\n')
+                      else: out.append(' ')
+                      i+=1; continue
+                  if depth:
+                      if text.startswith('/-',i): depth+=1; out.extend('  '); i+=2
+                      elif text.startswith('-/',i): depth-=1; out.extend('  '); i+=2
+                      else: out.append('\\n' if text[i]=='\\n' else ' '); i+=1
+                      continue
+                  if text.startswith('--',i): line_comment=True; out.extend('  '); i+=2
+                  elif text.startswith('/-',i): depth=1; out.extend('  '); i+=2
+                  else: out.append(text[i]); i+=1
+              for n,line in enumerate(''.join(out).splitlines(),1):
+                  if pat.search(line): bad.append(f'{p}:{n}:{line}')
+          if bad:
+              print('\\n'.join(bad)); sys.exit(1)
+          print('SORRY_SCAN=PASS')
+          PY
+      - name: Require a real independent-checker receipt
+        run: |
+          if [ ! -f pcss/receipts/independent-checker.json ]; then
+            echo 'INDEPENDENT_CHECKER=BLOCKED_NO_EXECUTION_RECEIPT'
+            echo 'A help/version probe is not an independent proof check.'
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, pathlib, sys
+          d=json.loads(pathlib.Path('pcss/receipts/independent-checker.json').read_text())
+          if d.get('status') != 'PASS' or not d.get('source_revision') or not d.get('theorem_manifest_sha256'):
+              print('INDEPENDENT_CHECKER=BLOCKED_INVALID_RECEIPT')
+              sys.exit(1)
+          print('INDEPENDENT_CHECKER=RECEIPT_PRESENT')
+          PY
+      - name: Upload formal receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcss-formal-receipts
+          path: artifacts/pcss/
+          if-no-files-found: error
+
+  evidence-contract:
+    name: Evidence schema and fail-closed admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.25.1
+      - name: Validate evidence contract
+        run: |
+          python3 -m json.tool pcss/schemas/speedup-evidence.schema.json >/dev/null
+          python3 scripts/pcss/validate_evidence.py --schema pcss/schemas/speedup-evidence.schema.json --self-test
+      - name: Upload schema validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcss-evidence-contract
+          path: artifacts/pcss-schema/
+          if-no-files-found: error
+
+  promotion:
+    name: PCSS claim promotion gate
+    runs-on: ubuntu-latest
+    needs: [formal-build, evidence-contract]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.25.1
+      - name: Require and validate a fresh candidate receipt
+        run: |
+          if [ "${{ needs.formal-build.result }}" != "success" ] || [ "${{ needs.evidence-contract.result }}" != "success" ]; then
+            echo 'PCSS_PROMOTION=BLOCKED_FORMAL_OR_SCHEMA_GATE'
+            exit 1
+          fi
+          if [ ! -f pcss/evidence/sim2xr_shared_prefix.json ]; then
+            echo 'PCSS_PROMOTION=BLOCKED_NO_FRESH_SIM2XR_RECEIPT'
+            echo 'Historical ratios are not substituted for raw target-device timings.'
+            exit 1
+          fi
+          python3 scripts/pcss/validate_evidence.py --schema pcss/schemas/speedup-evidence.schema.json --evidence pcss/evidence/sim2xr_shared_prefix.json
