@@ -61,7 +61,6 @@ jobs:
           for p in pathlib.Path('.').rglob('*.lean'):
               if any(x in p.parts for x in ('.lake','.git')): continue
               text=p.read_text(encoding='utf-8')
-              # Strip line comments and nested block comments before scanning.
               out=[]; i=0; depth=0; line_comment=False
               while i < len(text):
                   if line_comment:
@@ -82,16 +81,21 @@ jobs:
               print('\\n'.join(bad)); sys.exit(1)
           print('SORRY_SCAN=PASS')
           PY
-      - name: Independent checker gate status
-        if: always()
+      - name: Require a real independent-checker receipt
         run: |
-          if [ -f pcss/comparator.json ] && [ -f pcss/Challenge.lean ] && [ -f pcss/Solution.lean ]; then
-            echo 'INDEPENDENT_CHECKER=CONFIG_PRESENT_REQUIRES_ACTUAL_COMPARATOR_RUN'
-            echo 'This repository currently has no validated comparator execution receipt.'
+          if [ ! -f pcss/receipts/independent-checker.json ]; then
+            echo 'INDEPENDENT_CHECKER=BLOCKED_NO_EXECUTION_RECEIPT'
+            echo 'A help/version probe is not an independent proof check.'
             exit 1
           fi
-          echo 'INDEPENDENT_CHECKER=BLOCKED_NOT_CONFIGURED'
-          echo 'No independent checker pass is claimed; candidate promotion remains blocked.'
+          python3 - <<'PY'
+          import json, pathlib, sys
+          d=json.loads(pathlib.Path('pcss/receipts/independent-checker.json').read_text())
+          if d.get('status') != 'PASS' or not d.get('source_revision') or not d.get('theorem_manifest_sha256'):
+              print('INDEPENDENT_CHECKER=BLOCKED_INVALID_RECEIPT')
+              sys.exit(1)
+          print('INDEPENDENT_CHECKER=RECEIPT_PRESENT')
+          PY
       - name: Upload formal receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -120,15 +124,23 @@ jobs:
           if-no-files-found: error
 
   promotion:
-    name: PCSS promotion decision
+    name: PCSS claim promotion gate
     runs-on: ubuntu-latest
     needs: [formal-build, evidence-contract]
     if: always()
     steps:
-      - name: Enforce fail-closed promotion
+      - uses: actions/checkout@v4
+      - name: Install schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.25.1
+      - name: Require and validate a fresh candidate receipt
         run: |
           if [ "${{ needs.formal-build.result }}" != "success" ] || [ "${{ needs.evidence-contract.result }}" != "success" ]; then
-            echo 'PCSS_PROMOTION=BLOCKED'
+            echo 'PCSS_PROMOTION=BLOCKED_FORMAL_OR_SCHEMA_GATE'
             exit 1
           fi
-          echo 'PCSS_PROMOTION=CLAIM_BLOCKED_UNTIL_INDEPENDENT_CHECKER_AND_LIVE_RECEIPT'
+          if [ ! -f pcss/evidence/sim2xr_shared_prefix.json ]; then
+            echo 'PCSS_PROMOTION=BLOCKED_NO_FRESH_SIM2XR_RECEIPT'
+            echo 'Historical ratios are not substituted for raw target-device timings.'
+            exit 1
+          fi
+          python3 scripts/pcss/validate_evidence.py --schema pcss/schemas/speedup-evidence.schema.json --evidence pcss/evidence/sim2xr_shared_prefix.json
